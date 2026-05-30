@@ -14,6 +14,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 from database import connect_db, close_db, get_db
 from routers import tasks, cat, notifications
 from services.notification_service import generate_useless_notification
+from flask import Flask, g
+from pymongo import MongoClient
+from routers.flask_tasks import bp as flask_tasks_bp
+from a2wsgi import WSGIMiddleware
 
 scheduler = AsyncIOScheduler()
 
@@ -50,6 +54,25 @@ app.add_middleware(
 app.include_router(tasks.router, prefix="/api")
 app.include_router(cat.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+
+_MONGODB_URL = os.getenv("MONGODB_URL")
+_MONGODB_DB = os.getenv("MONGODB_DB")
+
+flask_app = Flask(__name__)
+flask_app.register_blueprint(flask_tasks_bp)
+
+@flask_app.before_request
+def open_db():
+    g.client = MongoClient(_MONGODB_URL)
+    g.db = g.client[_MONGODB_DB]
+
+@flask_app.teardown_appcontext
+def close_db(exc):
+    client = g.pop("client", None)
+    if client:
+        client.close()
+
+app.mount("/flask", WSGIMiddleware(flask_app))
 
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_dir):

@@ -8,3 +8,4 @@ python-dotenv==1.0.1
 aiofiles==23.2.1
 flask==3.0.3
 pymongo==4.7.2
+a2wsgi==1.10.7
