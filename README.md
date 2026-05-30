@@ -15,39 +15,62 @@ Recebe tarefas, consulta o Gemini para gerar desculpas de procrastinação e ger
 
 ## Pré-requisitos
 
-- Chave da Gemini API — grátis em [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- Docker + Docker Compose **ou** Python 3.11+ com MongoDB local
+1. **Chave da Gemini API** (grátis)
+   - Gere em [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
-## Rodando com Docker (recomendado)
+2. **MongoDB** — escolha uma opção:
+   - **MongoDB Atlas** (recomendado para produção/apresentação) — cloud grátis
+   - **MongoDB local** — para desenvolvimento
 
-Sobe o backend e o MongoDB com um único comando:
+## Opção 1: MongoDB Atlas + Docker (mais prático)
+
+Sobe o backend com MongoDB Atlas:
 
 ```bash
-# Na raiz do repositório (onde está o docker-compose.yml)
-cp backend/.env.example backend/.env
-# Edite backend/.env e preencha GEMINI_API_KEY
+# 1. Clone o repositório
+git clone https://github.com/isabelapt/hackcodecon-codequeens-back.git
+cd hackcodecon-codequeens-back
 
+# 2. Crie o .env
+cp backend/.env.example backend/.env
+
+# 3. Configure no backend/.env:
+#    - GEMINI_API_KEY (gerada acima)
+#    - MONGODB_URL (do cluster Atlas)
+
+# 4. Suba com Docker
 docker compose up --build
 ```
 
 Acesse `http://localhost:8000/docs` para a documentação interativa.
 
-> Os dados do MongoDB ficam no volume `mongo_data` — persistem entre reinicializações.
+> **Gerando a connection string do Atlas:**
+> 1. Crie conta em [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
+> 2. Deploy FREE cluster
+> 3. Clique **Connect** → **Drivers** → Python
+> 4. Copia a string e coloca em `MONGODB_URL` do `.env`
 
-## Rodando localmente (sem Docker)
+## Opção 2: Desenvolvimento Local (sem Docker)
+
+Para trabalhar sem Docker, use MongoDB local:
 
 ```bash
-# 1. Instale as dependências
+# 1. Instale MongoDB Community:
+#    https://www.mongodb.com/try/download/community
+#    Inicie mongod (roda na porta 27017 por padrão)
+
+# 2. Setup do backend
 python -m venv venv
 source venv/bin/activate   # Linux / Mac
 venv\Scripts\activate      # Windows
 pip install -r requirements.txt
 
-# 2. Configure as variáveis de ambiente
+# 3. Configure .env
 cp .env.example .env
-# Edite .env: GEMINI_API_KEY, MONGODB_URL, MONGODB_DB
+# Deixe MONGODB_URL como mongodb://localhost:27017
 
-# 3. Certifique-se que o MongoDB está rodando em localhost:27017
+# 4. Inicie o servidor
+uvicorn main:app --reload --port 8000
 
 # 4. Inicie o servidor
 uvicorn main:app --reload --port 8000
