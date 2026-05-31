@@ -64,6 +64,11 @@ def delete(col, task_id):
     return serialize(result) if result else None
 
 async def build_excuse(nome, data_termino=None):
+    if isinstance(data_termino, str):
+        try:
+            data_termino = datetime.fromisoformat(data_termino)
+        except ValueError:
+            data_termino = None
     return await get_procrastination_excuse(nome, data_termino)
 
 def get_excuse(nome, data_termino=None):
