@@ -8,8 +8,9 @@ Recebe tarefas, consulta o Gemini para gerar desculpas de procrastinação e ger
 | | |
 |---|---|
 | **Runtime** | Python 3.11+ |
-| **Framework** | FastAPI |
-| **Banco** | MongoDB via Motor (async) |
+| **Framework principal** | FastAPI |
+| **Framework secundário** | Flask (montado dentro do FastAPI via `a2wsgi`) |
+| **Banco** | MongoDB via Motor (async) + PyMongo (sync) |
 | **IA** | Google Gemini 2.5 Flash |
 | **Agendamento** | APScheduler |
 
@@ -37,6 +38,7 @@ cp backend/.env.example backend/.env
 # 3. Configure no backend/.env:
 #    - GEMINI_API_KEY (gerada acima)
 #    - MONGODB_URL (do cluster Atlas)
+#    - MONGODB_DB (nome do banco)
 
 # 4. Suba com Docker
 docker compose up --build
@@ -60,33 +62,41 @@ Para trabalhar sem Docker, use MongoDB local:
 #    Inicie mongod (roda na porta 27017 por padrão)
 
 # 2. Setup do backend
-python -m venv venv
+py -3.11 -m venv venv
 source venv/bin/activate   # Linux / Mac
 venv\Scripts\activate      # Windows
-pip install -r requirements.txt
+py -3.11 -m pip install -r requirements.txt
 
 # 3. Configure .env
 cp .env.example .env
-# Deixe MONGODB_URL como mongodb://localhost:27017
+# Preencha MONGODB_URL, MONGODB_DB e GEMINI_API_KEY
 
 # 4. Inicie o servidor
-uvicorn main:app --reload --port 8000
-
-# 4. Inicie o servidor
-uvicorn main:app --reload --port 8000
+py -3.11 -m uvicorn main:app --reload --port 8000
 ```
+
+> **Atenção:** Use Python 3.11. Versões mais novas (3.13+) podem ter incompatibilidades com `pydantic-core`.
+> Se tiver problemas de SSL ao instalar dependências, use:
+> ```bash
+> py -3.11 -m pip install -r requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
+> ```
 
 ## Variáveis de ambiente
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
 | `GEMINI_API_KEY` | Sim | Chave da API do Google AI Studio |
+| `MONGODB_URL` | Sim | Connection string do MongoDB |
+| `MONGODB_DB` | Sim | Nome do banco de dados |
+| `FLASK_DEBUG` | Não | Ativa modo debug do Flask (`true`/`false`, padrão `false`) |
 
 Nunca commite o arquivo `.env`. O `.gitignore` já o exclui.
 
 ## Endpoints
 
-### Tarefas
+### Tarefas (FastAPI)
+
+> As rotas `/api/tasks/` são mantidas para compatibilidade com o Gemini (geração de desculpas). O gerenciamento principal de tarefas é feito pelas rotas Flask em `/flask/tasks/`.
 
 | Método | Rota | Descrição |
 |---|---|---|
@@ -112,6 +122,46 @@ Nunca commite o arquivo `.env`. O `.gitignore` já o exclui.
 | `POST` | `/api/notifications/generate` | Gera uma notificação inútil |
 | `POST` | `/api/notifications/mark-read` | Marca todas como lidas |
 | `GET` | `/api/notifications/stream` | SSE — stream de notificações a cada 30s |
+
+### Gerenciamento de Tarefas (Flask)
+
+Montado em `/flask` dentro do mesmo servidor FastAPI (porta `8000`).
+
+Campos da tarefa:
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `id` | string | ObjectId do MongoDB |
+| `nome` | string | Nome da tarefa |
+| `data_termino` | string (ISO 8601) | Data de término |
+| `concluida` | boolean | Se a tarefa foi concluída |
+| `vezes_adiada` | integer | Número de vezes que foi adiada |
+| `desistiu` | boolean | Se o usuário desistiu da tarefa |
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/flask/tasks/` | Lista todas as tarefas |
+| `GET` | `/flask/tasks/{id}` | Busca uma tarefa |
+| `POST` | `/flask/tasks/` | Cria uma tarefa |
+| `PUT` | `/flask/tasks/{id}` | Substitui a tarefa inteira |
+| `PATCH` | `/flask/tasks/{id}` | Atualiza campos parcialmente |
+| `DELETE` | `/flask/tasks/{id}` | Deleta uma tarefa |
+
+**Exemplos de uso com os botões do frontend:**
+
+```js
+// Adiar 1 dia
+PATCH /flask/tasks/{id}
+{ "data_termino": "2025-12-02T10:00:00", "vezes_adiada": 2 }
+
+// Desistir
+PATCH /flask/tasks/{id}
+{ "desistiu": true }
+
+// Concluir
+PATCH /flask/tasks/{id}
+{ "concluida": true }
+```
 
 ## Exemplo de uso
 
@@ -140,21 +190,29 @@ curl -X POST http://localhost:8000/api/tasks/1/decide \
   -d '{"accept_postponement": true, "new_date": "2026-06-03T10:00:00"}'
 ```
 
+**Criar tarefa (Flask):**
+```bash
+curl -X POST http://localhost:8000/flask/tasks/ \
+  -H "Content-Type: application/json" \
+  -d '{"nome": "Estudar Python", "data_termino": "2025-12-01T10:00:00"}'
+```
+
 ## Estrutura
 
 ```
-backend/
-├── main.py                  # App FastAPI, CORS, scheduler, lifespan
-├── models.py                # Modelos SQLAlchemy: Task, CatState, Notification
-├── database.py              # Engine SQLite, sessão, init_db
+├── main.py                        # App FastAPI + Flask montado via WSGIMiddleware
+├── models.py                      # Modelos: Task, CatState, Notification
+├── database.py                    # Conexão Motor (async) com MongoDB
 ├── routers/
-│   ├── tasks.py             # CRUD de tarefas + lógica de decisão
-│   ├── cat.py               # Estado e alimentação do gato
-│   └── notifications.py    # Notificações + SSE stream
+│   ├── tasks.py                   # CRUD de tarefas + lógica de decisão (FastAPI)
+│   ├── cat.py                     # Estado e alimentação do gato
+│   ├── notifications.py           # Notificações + SSE stream
+│   └── flask_tasks.py             # Endpoints Flask de gerenciamento de tarefas
 ├── services/
-│   ├── gemini_service.py   # Integração Gemini 2.5 Flash com fallbacks
-│   ├── cat_service.py      # Cálculo de humor/destruição do gato
-│   └── notification_service.py  # Pool de fatos inúteis
+│   ├── gemini_service.py          # Integração Gemini 2.5 Flash com fallbacks
+│   ├── cat_service.py             # Cálculo de humor/destruição do gato
+│   ├── notification_service.py    # Pool de fatos inúteis
+│   └── flask_tasks_service.py     # Lógica de negócio das tarefas Flask
 ├── requirements.txt
 ├── .env.example
 └── .gitignore
@@ -162,7 +220,13 @@ backend/
 
 ## Lógica do gato
 
-O estado do gato é recalculado a cada operação de tarefa:
+O estado do gato é recalculado automaticamente após cada operação nas tarefas Flask (`POST`, `PUT`, `PATCH`, `DELETE`), lendo da coleção `flask_tasks`:
+
+| Ação na tarefa | Efeito no gato |
+|---|---|
+| `concluida: true` | ↑ felicidade |
+| `desistiu: true` | ↑ irritação |
+| `vezes_adiada` aumenta | ↑ irritação (peso menor que desistir) |
 
 | Humor | Felicidade | Comportamento |
 |---|---|---|
