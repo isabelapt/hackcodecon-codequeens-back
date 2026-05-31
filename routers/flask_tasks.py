@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, g
 from services import flask_tasks_service as svc
+from datetime import datetime
 
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 
@@ -26,7 +27,37 @@ def create():
     body = request.get_json()
     if not body or not body.get("nome"):
         return jsonify({"error": "Campo 'nome' é obrigatório"}), 400
-    return jsonify(svc.create(col(), body)), 201
+    
+    doc = {
+        "nome": body["nome"],
+        "data_termino": body.get("data_termino"),
+        "concluida": False,
+        "vezes_adiada": 0,
+        "desistiu": False,
+        "desculpa": None,
+        "created_at": datetime.utcnow(),
+        "completed_at": None,
+    }
+
+    created = svc.create(col(), doc)
+    excuse_data = svc.get_excuse(
+        body["nome"],
+        body.get("data_termino"),
+    )
+
+    svc.patch(col(), created["id"], {
+        "desculpa": excuse_data["excuse"]
+    })
+
+    created["desculpa"] = excuse_data["excuse"]
+
+    return jsonify({
+        "task": created,
+        "excuse": excuse_data["excuse"],
+        "suggested_postpone_hours": excuse_data["suggested_postpone_hours"],
+        "suggested_new_date": excuse_data["suggested_new_date"],
+        "confidence": excuse_data["confidence"],
+    }), 201
 
 
 @bp.put("/<task_id>")

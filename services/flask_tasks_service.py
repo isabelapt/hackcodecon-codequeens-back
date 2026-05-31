@@ -1,5 +1,7 @@
 from bson import ObjectId
 from datetime import datetime, timezone
+import asyncio
+from services.gemini_service import get_procrastination_excuse
 
 
 def serialize(task):
@@ -52,3 +54,9 @@ def patch(col, task_id, updates):
 def delete(col, task_id):
     result = col.find_one_and_delete({"_id": ObjectId(task_id)})
     return serialize(result) if result else None
+
+async def build_excuse(nome, data_termino=None):
+    return await get_procrastination_excuse(nome, data_termino)
+
+def get_excuse(nome, data_termino=None):
+    return asyncio.run(build_excuse(nome, data_termino))

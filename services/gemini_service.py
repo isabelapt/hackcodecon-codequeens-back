@@ -21,11 +21,10 @@ FALLBACK_EXCUSES = [
 POSTPONE_HOURS = [24, 48, 72, 168]  # 1d, 2d, 3d, 1 semana
 
 
-def _build_prompt(task_title: str, task_description: str, scheduled_at: str) -> str:
+def _build_prompt(task_title: str, scheduled_at: str) -> str:
     return f"""Você é um assistente de procrastinação especializado em inventar desculpas criativas, absurdas e engraçadas para desenvolvedores adiarem tarefas.
 
 Tarefa: "{task_title}"
-Descrição: "{task_description}"
 Agendada para: {scheduled_at}
 
 Crie UMA desculpa curta (máximo 2 frases) para justificar o adiamento desta tarefa.
@@ -37,7 +36,6 @@ Responda em português brasileiro."""
 
 async def get_procrastination_excuse(
     task_title: str,
-    task_description: str = "",
     scheduled_at: datetime = None,
 ) -> dict:
     scheduled_str = scheduled_at.strftime("%d/%m/%Y %H:%M") if scheduled_at else "agora"
@@ -47,7 +45,7 @@ async def get_procrastination_excuse(
     try:
         genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
         model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content(_build_prompt(task_title, task_description, scheduled_str))
+        response = model.generate_content(_build_prompt(task_title, scheduled_str))
         excuse = response.text.strip()
     except Exception:
         excuse = random.choice(FALLBACK_EXCUSES)
