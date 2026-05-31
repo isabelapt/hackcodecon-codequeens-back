@@ -1,102 +1,134 @@
-# Goose Cat — Backend
+# 🐱 Chewie The Cat — Backend
 
-API REST do Goose Cat, o gerenciador de tarefas que trabalha contra você.
-Recebe tarefas, consulta o Gemini para gerar desculpas de procrastinação e gerencia um gatinho virtual que vira monstro quando você não é produtivo.
+> **Um projeto criado para o Hackathon CodeCon Universe** 🚀
 
-## Stack
+## O que é isso? 🤔
 
-| | |
+Bem-vindo ao **Goose Cat**, o gerenciador de tarefas que sabe exatamente como te desmotivar! 
+
+Se você é aquele tipo de pessoa que procrastina olhando para um gatinho fofo, então este projeto é **perfeito** para você. Aqui, temos um gatinho virtual que não só observa suas tarefas como também **se transforma em monstro** quando você não é produtivo. Além disso, toda vez que você não consegue fazer uma tarefa, o **Gemini (nossa IA favorita) gera desculpas criativas** para justificar sua preguiça. 
+
+Sim, é como ter um amigo que o julga passivamente enquanto oferece motivação de forma cáustica. 😹
+
+---
+
+## ⚙️ Tech Stack
+
+| Componente | Tecnologia |
 |---|---|
 | **Runtime** | Python 3.11+ |
-| **Framework principal** | FastAPI |
-| **Framework secundário** | Flask (montado dentro do FastAPI via `a2wsgi`) |
-| **Banco** | MongoDB via Motor (async) + PyMongo (sync) |
-| **IA** | Google Gemini 2.5 Flash |
-| **Agendamento** | APScheduler |
+| **Framework API** | FastAPI |
+| **Framework Secundário** | Flask (integrado via `a2wsgi`) |
+| **Banco de Dados** | MongoDB (Motor para async + PyMongo para sync) |
+| **Gerador de Desculpas** | Google Gemini 2.5 Flash |
+| **Agendador de Tarefas** | APScheduler |
 
-## Pré-requisitos
+---
 
-1. **Chave da Gemini API** (grátis)
+## 📋 Pré-requisitos
+
+Antes de começar, você vai precisar de:
+
+1. **Chave da Gemini API** (sim, é de graça!)
    - Gere em [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
-2. **MongoDB** — escolha uma opção:
-   - **MongoDB Atlas** (recomendado para produção/apresentação) — cloud grátis
-   - **MongoDB local** — para desenvolvimento
+2. **MongoDB** — escolha seu poison:
+   - **MongoDB Atlas** ☁️ (recomendado para produção/apresentação) — cloud grátis
+   - **MongoDB local** 💻 (para desenvolvimento local)
 
-## Opção 1: MongoDB Atlas + Docker (mais prático)
+3. **Docker** (opcional, mas facilita a vida)
 
-Sobe o backend com MongoDB Atlas:
+---
+
+## 🚀 Setup: Opção 1 — MongoDB Atlas + Docker (O caminho fácil)
+
+Se você quer que tudo "just work", use Docker com MongoDB Atlas:
 
 ```bash
 # 1. Clone o repositório
 git clone https://github.com/isabelapt/hackcodecon-codequeens-back.git
 cd hackcodecon-codequeens-back
 
-# 2. Crie o .env
-cp backend/.env.example backend/.env
+# 2. Crie seu arquivo .env (copie o exemplo)
+cp .env.example .env
 
-# 3. Configure no backend/.env:
-#    - GEMINI_API_KEY (gerada acima)
-#    - MONGODB_URL (do cluster Atlas)
-#    - MONGODB_DB (nome do banco)
+# 3. Configure no .env:
+#    - GEMINI_API_KEY (da chave que você gerou)
+#    - MONGODB_URL (connection string do Atlas)
+#    - MONGODB_DB (nome do seu banco)
 
-# 4. Suba com Docker
+# 4. Levante o servidor com Docker
 docker compose up --build
 ```
 
-Acesse `http://localhost:8000/docs` para a documentação interativa.
+Pronto! Acesse `http://localhost:8000/docs` para a **documentação interativa** da API. 📚
 
-> **Gerando a connection string do Atlas:**
-> 1. Crie conta em [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
-> 2. Deploy FREE cluster
-> 3. Clique **Connect** → **Drivers** → Python
-> 4. Copia a string e coloca em `MONGODB_URL` do `.env`
+### 📌 Gerando a connection string do MongoDB Atlas
 
-## Opção 2: Desenvolvimento Local (sem Docker)
+1. Crie uma conta em [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
+2. Deploy um cluster FREE
+3. Clique em **Connect** → **Drivers** → **Python**
+4. Copie a connection string e jogue em `MONGODB_URL` do `.env`
 
-Para trabalhar sem Docker, use MongoDB local:
+---
+
+## 🛠️ Setup: Opção 2 — Desenvolvimento Local (Sem Docker)
+
+Quer brincar sem Docker? Sem problema!
 
 ```bash
-# 1. Instale MongoDB Community:
+# 1. Instale MongoDB Community (se ainda não tem):
 #    https://www.mongodb.com/try/download/community
-#    Inicie mongod (roda na porta 27017 por padrão)
+#    Abra um terminal separado e execute: mongod
 
-# 2. Setup do backend
+# 2. Setup do projeto Python
 py -3.11 -m venv venv
-source venv/bin/activate   # Linux / Mac
+
+# Ative o ambiente virtual:
+source venv/bin/activate   # Linux / macOS
 venv\Scripts\activate      # Windows
+
+# 3. Instale as dependências
 py -3.11 -m pip install -r requirements.txt
 
-# 3. Configure .env
+# 4. Configure o .env
 cp .env.example .env
 # Preencha MONGODB_URL, MONGODB_DB e GEMINI_API_KEY
 
-# 4. Inicie o servidor
+# 5. Inicie o servidor
 py -3.11 -m uvicorn main:app --reload --port 8000
 ```
 
-> **Atenção:** Use Python 3.11. Versões mais novas (3.13+) podem ter incompatibilidades com `pydantic-core`.
-> Se tiver problemas de SSL ao instalar dependências, use:
-> ```bash
-> py -3.11 -m pip install -r requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
-> ```
+Acesse `http://localhost:8000/docs` e aproveite! 🎉
 
-## Variáveis de ambiente
+### ⚠️ Troubleshooting Python
 
-| Variável | Obrigatória | Descrição |
+- **Use Python 3.11!** Versões mais novas (3.13+) têm problemas com `pydantic-core`.
+- Se tiver erros de SSL ao instalar dependências:
+  ```bash
+  py -3.11 -m pip install -r requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
+  ```
+
+---
+
+## 🔑 Variáveis de Ambiente
+
+| Variável | Obrigatória | O que é |
 |---|---|---|
-| `GEMINI_API_KEY` | Sim | Chave da API do Google AI Studio |
-| `MONGODB_URL` | Sim | Connection string do MongoDB |
-| `MONGODB_DB` | Sim | Nome do banco de dados |
-| `FLASK_DEBUG` | Não | Ativa modo debug do Flask (`true`/`false`, padrão `false`) |
+| `GEMINI_API_KEY` | ✅ | Sua chave de acesso à API do Google Gemini |
+| `MONGODB_URL` | ✅ | A connection string do seu MongoDB (Atlas ou local) |
+| `MONGODB_DB` | ✅ | Nome do banco de dados (ex: `goosecat`) |
+| `FLASK_DEBUG` | ❌ | Ativa modo debug do Flask (`true`/`false`, padrão: `false`) |
 
-Nunca commite o arquivo `.env`. O `.gitignore` já o exclui.
+**Dica:** Nunca commite o `.env`! O `.gitignore` já cuida disso. 🔒
 
-## Endpoints
+---
 
-### Tarefas (FastAPI)
+## 🔌 Endpoints da API
 
-> As rotas `/api/tasks/` são mantidas para compatibilidade com o Gemini (geração de desculpas). O gerenciamento principal de tarefas é feito pelas rotas Flask em `/flask/tasks/`.
+### 🐱 Tarefas (FastAPI)
+
+> **Nota:** As rotas `/api/tasks/` são mantidas para compatibilidade com o Gemini (geração de desculpas). O gerenciamento principal de tarefas é feito via Flask em `/flask/tasks/`.
 
 | Método | Rota | Descrição |
 |---|---|---|
@@ -236,3 +268,35 @@ O estado do gato é recalculado automaticamente após cada operação nas tarefa
 | 👹 Monster | 0–25% | Destrói seu workspace (mensagens aleatórias) |
 
 O campo `destruction_level` (0–5) acumula ações destrutivas quando o gato está no estado monster.
+
+---
+
+## 🔧 Instalação com MongoDB Atlas
+
+Se você quer uma documentação mais detalhada sobre como configurar o MongoDB Atlas, veja [MONGODB_ATLAS_SETUP.md](./MONGODB_ATLAS_SETUP.md).
+
+---
+
+## 📝 Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
+
+---
+
+## 👑 Agradecimentos Especiais
+
+Este projeto foi desenvolvido com ❤️ pela equipe **Code Queens** durante o **Hackathon CodeCon Universe**.
+
+Um agradecimento especial aos membros da equipe que tornaram isso possível:
+
+- **Erica** — Nossa PM e Designer UX/UI ✨ (visão do projeto + interface linda)
+- **Isabela** — Dev Back-end 💻 (arquitetura robusta do servidor)
+- **Maria Eduarda** — Dev Full-Stack 🚀 (conectando front e back com maestria)
+- **Marina** — Dev Front-end 🎨 (tornando o gato irresistível)
+- **Tissiany** — Dev Front-end 💅 (polimento final da interface)
+
+Sem essa equipe incrível, o Goose Cat seria apenas... um gato comum. 😹
+
+---
+
+**Desenvolvido com café, sem paciência e muito humor! ☕😄**
