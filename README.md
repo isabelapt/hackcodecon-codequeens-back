@@ -96,6 +96,8 @@ Nunca commite o arquivo `.env`. O `.gitignore` já o exclui.
 
 ### Tarefas (FastAPI)
 
+> As rotas `/api/tasks/` são mantidas para compatibilidade com o Gemini (geração de desculpas). O gerenciamento principal de tarefas é feito pelas rotas Flask em `/flask/tasks/`.
+
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/api/tasks/` | Lista todas as tarefas |
@@ -218,7 +220,13 @@ curl -X POST http://localhost:8000/flask/tasks/ \
 
 ## Lógica do gato
 
-O estado do gato é recalculado a cada operação de tarefa:
+O estado do gato é recalculado automaticamente após cada operação nas tarefas Flask (`POST`, `PUT`, `PATCH`, `DELETE`), lendo da coleção `flask_tasks`:
+
+| Ação na tarefa | Efeito no gato |
+|---|---|
+| `concluida: true` | ↑ felicidade |
+| `desistiu: true` | ↑ irritação |
+| `vezes_adiada` aumenta | ↑ irritação (peso menor que desistir) |
 
 | Humor | Felicidade | Comportamento |
 |---|---|---|

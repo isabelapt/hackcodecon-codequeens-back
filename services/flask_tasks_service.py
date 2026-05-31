@@ -1,5 +1,6 @@
 from bson import ObjectId
 from datetime import datetime, timezone
+from services.cat_service import recalculate_cat_sync
 
 
 def serialize(task):
@@ -27,6 +28,7 @@ def create(col, body):
     result = col.insert_one(task)
     task["id"] = str(result.inserted_id)
     task.pop("_id", None)
+    recalculate_cat_sync(col.database)
     return task
 
 
@@ -39,6 +41,8 @@ def put(col, task_id, body):
         "desistiu": body.get("desistiu", False),
     }
     result = col.find_one_and_replace({"_id": ObjectId(task_id)}, updated, return_document=True)
+    if result:
+        recalculate_cat_sync(col.database)
     return serialize(result) if result else None
 
 
@@ -46,9 +50,13 @@ def patch(col, task_id, updates):
     result = col.find_one_and_update(
         {"_id": ObjectId(task_id)}, {"$set": updates}, return_document=True
     )
+    if result:
+        recalculate_cat_sync(col.database)
     return serialize(result) if result else None
 
 
 def delete(col, task_id):
     result = col.find_one_and_delete({"_id": ObjectId(task_id)})
+    if result:
+        recalculate_cat_sync(col.database)
     return serialize(result) if result else None
