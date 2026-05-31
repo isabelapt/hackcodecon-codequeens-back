@@ -19,18 +19,66 @@ DESTRUCTION_MESSAGES = [
 ]
 
 
-async def recalculate_cat(db: AsyncIOMotorDatabase) -> dict:
-    total = await db.tasks.count_documents({})
-    done = await db.tasks.count_documents({"status": "done"})
-    overdue = await db.tasks.count_documents({"status": "overdue"})
-    procrastinated = await db.tasks.count_documents({"status": "procrastinated"})
+def recalculate_cat_sync(db) -> dict:
+    """Versão síncrona (PyMongo) — chamada pelas rotas Flask."""
+    total = db.flask_tasks.count_documents({})
+    done = db.flask_tasks.count_documents({"concluida": True})
+    desistiu = db.flask_tasks.count_documents({"desistiu": True})
+    adiadas = sum(t.get("vezes_adiada", 0) for t in db.flask_tasks.find({}, {"vezes_adiada": 1}))
 
     if total == 0:
         happiness = 70.0
         hunger = 30.0
     else:
         happiness = min(100.0, (done / total) * 120)
-        hunger = min(100.0, ((overdue + procrastinated * 0.5) / total) * 100)
+        hunger = min(100.0, ((desistiu + adiadas * 0.3) / max(total, 1)) * 100)
+
+    if happiness >= 75:
+        mood = "happy"
+    elif happiness >= 50:
+        mood = "neutral"
+    elif happiness >= 25:
+        mood = "grumpy"
+    else:
+        mood = "monster"
+
+    update = {
+        "mood": mood,
+        "happiness": round(happiness, 1),
+        "hunger": round(hunger, 1),
+        "updated_at": datetime.utcnow(),
+    }
+
+    if mood == "monster" and random.random() < 0.3:
+        cat = db.cat_state.find_one({"_id": "main"}) or {}
+        new_level = min(5, cat.get("destruction_level", 0) + 1)
+        update["destruction_level"] = new_level
+        msg = random.choice(DESTRUCTION_MESSAGES)
+        db.notifications.insert_one({
+            "message": f"💥 DESTRUIÇÃO NÍVEL {new_level}: {msg}",
+            "category": "cat_destruction",
+            "is_read": False,
+            "created_at": datetime.utcnow(),
+        })
+
+    db.cat_state.update_one({"_id": "main"}, {"$set": update}, upsert=True)
+    return db.cat_state.find_one({"_id": "main"})
+
+
+async def recalculate_cat(db: AsyncIOMotorDatabase) -> dict:
+    total = await db.flask_tasks.count_documents({})
+    done = await db.flask_tasks.count_documents({"concluida": True})
+    desistiu = await db.flask_tasks.count_documents({"desistiu": True})
+    adiadas = 0
+    async for t in db.flask_tasks.find({}, {"vezes_adiada": 1}):
+        adiadas += t.get("vezes_adiada", 0)
+
+    if total == 0:
+        happiness = 70.0
+        hunger = 30.0
+    else:
+        happiness = min(100.0, (done / total) * 120)
+        hunger = min(100.0, ((desistiu + adiadas * 0.3) / max(total, 1)) * 100)
 
     if happiness >= 75:
         mood = "happy"
