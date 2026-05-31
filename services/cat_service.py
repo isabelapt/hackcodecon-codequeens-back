@@ -19,19 +19,41 @@ DESTRUCTION_MESSAGES = [
 ]
 
 
+def _compute_mood_metrics(ativas, pendentes, desistidas, adiadas):
+    """Calcula (happiness, hunger) a partir das pendências atuais.
+
+    Modelo de pressão (tetos baixos no histórico para o gato ser RECUPERÁVEL:
+    ao zerar as pendências ele volta a ficar feliz, independente do histórico):
+      - tarefas pendentes  → −15 cada (teto 75)   ← lever principal, muda a cada ação
+      - adiamentos         → −2  cada (teto 8)
+      - desistências       → −3  cada (teto 10)
+    Penalidade fixa máx. de histórico = 18 → lista limpa (0 pendentes) ⇒ ~82 (happy).
+    Lista sem tarefas = estado neutro inicial (70).
+    """
+    if ativas == 0 and desistidas == 0:
+        return 70.0, 30.0
+
+    pen_pendentes = min(75, pendentes * 15)
+    pen_adiadas = min(8, adiadas * 2)
+    pen_desist = min(10, desistidas * 3)
+    happiness = max(0.0, 100.0 - pen_pendentes - pen_adiadas - pen_desist)
+
+    hunger = min(100.0, pendentes * 15 + min(20, adiadas * 2) + min(20, desistidas * 3))
+    return happiness, hunger
+
+
 def recalculate_cat_sync(db) -> dict:
     """Versão síncrona (PyMongo) — chamada pelas rotas Flask."""
-    total = db.flask_tasks.count_documents({})
-    done = db.flask_tasks.count_documents({"concluida": True})
-    desistiu = db.flask_tasks.count_documents({"desistiu": True})
-    adiadas = sum(t.get("vezes_adiada", 0) for t in db.flask_tasks.find({}, {"vezes_adiada": 1}))
+    # Humor por "pressão de tarefas em aberto": cada tarefa pendente, adiada ou
+    # abandonada deixa o gato mais triste. Como depende da quantidade ATUAL de
+    # pendências (e não da razão sobre todo o histórico), cada ação do usuário
+    # — concluir, criar, adiar, desistir — move o humor de forma perceptível.
+    ativas = db.flask_tasks.count_documents({"desistiu": {"$ne": True}})
+    pendentes = db.flask_tasks.count_documents({"desistiu": {"$ne": True}, "concluida": {"$ne": True}})
+    desistidas = db.flask_tasks.count_documents({"desistiu": True})
+    adiadas = sum(t.get("vezes_adiada", 0) for t in db.flask_tasks.find({"desistiu": {"$ne": True}}, {"vezes_adiada": 1}))
 
-    if total == 0:
-        happiness = 70.0
-        hunger = 30.0
-    else:
-        happiness = min(100.0, (done / total) * 120)
-        hunger = min(100.0, ((desistiu + adiadas * 0.3) / max(total, 1)) * 100)
+    happiness, hunger = _compute_mood_metrics(ativas, pendentes, desistidas, adiadas)
 
     if happiness >= 75:
         mood = "happy"
@@ -66,19 +88,15 @@ def recalculate_cat_sync(db) -> dict:
 
 
 async def recalculate_cat(db: AsyncIOMotorDatabase) -> dict:
-    total = await db.flask_tasks.count_documents({})
-    done = await db.flask_tasks.count_documents({"concluida": True})
-    desistiu = await db.flask_tasks.count_documents({"desistiu": True})
+    # mesma lógica de "pressão de tarefas em aberto" da versão síncrona
+    ativas = await db.flask_tasks.count_documents({"desistiu": {"$ne": True}})
+    pendentes = await db.flask_tasks.count_documents({"desistiu": {"$ne": True}, "concluida": {"$ne": True}})
+    desistidas = await db.flask_tasks.count_documents({"desistiu": True})
     adiadas = 0
-    async for t in db.flask_tasks.find({}, {"vezes_adiada": 1}):
+    async for t in db.flask_tasks.find({"desistiu": {"$ne": True}}, {"vezes_adiada": 1}):
         adiadas += t.get("vezes_adiada", 0)
 
-    if total == 0:
-        happiness = 70.0
-        hunger = 30.0
-    else:
-        happiness = min(100.0, (done / total) * 120)
-        hunger = min(100.0, ((desistiu + adiadas * 0.3) / max(total, 1)) * 100)
+    happiness, hunger = _compute_mood_metrics(ativas, pendentes, desistidas, adiadas)
 
     if happiness >= 75:
         mood = "happy"
