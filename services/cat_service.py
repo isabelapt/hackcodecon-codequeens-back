@@ -49,17 +49,23 @@ def recalculate_cat_sync(db) -> dict:
         "updated_at": datetime.utcnow(),
     }
 
-    if mood == "monster" and random.random() < 0.3:
-        cat = db.cat_state.find_one({"_id": "main"}) or {}
-        new_level = min(5, cat.get("destruction_level", 0) + 1)
-        update["destruction_level"] = new_level
-        msg = random.choice(DESTRUCTION_MESSAGES)
-        db.notifications.insert_one({
-            "message": f"💥 DESTRUIÇÃO NÍVEL {new_level}: {msg}",
-            "category": "cat_destruction",
-            "is_read": False,
-            "created_at": datetime.utcnow(),
-        })
+    cat = db.cat_state.find_one({"_id": "main"}) or {}
+    current_level = cat.get("destruction_level", 0)
+    if mood == "monster":
+        if random.random() < 0.3:
+            new_level = min(5, current_level + 1)
+            update["destruction_level"] = new_level
+            msg = random.choice(DESTRUCTION_MESSAGES)
+            db.notifications.insert_one({
+                "message": f"💥 DESTRUIÇÃO NÍVEL {new_level}: {msg}",
+                "category": "cat_destruction",
+                "is_read": False,
+                "created_at": datetime.utcnow(),
+            })
+    elif current_level > 0:
+        # Gato saiu do modo monstro: o estrago "cicatriza" aos poucos
+        # (−1 por recálculo) até zerar, mantendo o gato recuperável.
+        update["destruction_level"] = current_level - 1
 
     db.cat_state.update_one({"_id": "main"}, {"$set": update}, upsert=True)
     return db.cat_state.find_one({"_id": "main"})
@@ -96,17 +102,23 @@ async def recalculate_cat(db: AsyncIOMotorDatabase) -> dict:
         "updated_at": datetime.utcnow(),
     }
 
-    if mood == "monster" and random.random() < 0.3:
-        cat = await db.cat_state.find_one({"_id": "main"})
-        new_level = min(5, (cat or {}).get("destruction_level", 0) + 1)
-        update["destruction_level"] = new_level
-        msg = random.choice(DESTRUCTION_MESSAGES)
-        await db.notifications.insert_one({
-            "message": f"💥 DESTRUIÇÃO NÍVEL {new_level}: {msg}",
-            "category": "cat_destruction",
-            "is_read": False,
-            "created_at": datetime.utcnow(),
-        })
+    cat = await db.cat_state.find_one({"_id": "main"}) or {}
+    current_level = cat.get("destruction_level", 0)
+    if mood == "monster":
+        if random.random() < 0.3:
+            new_level = min(5, current_level + 1)
+            update["destruction_level"] = new_level
+            msg = random.choice(DESTRUCTION_MESSAGES)
+            await db.notifications.insert_one({
+                "message": f"💥 DESTRUIÇÃO NÍVEL {new_level}: {msg}",
+                "category": "cat_destruction",
+                "is_read": False,
+                "created_at": datetime.utcnow(),
+            })
+    elif current_level > 0:
+        # Gato saiu do modo monstro: o estrago "cicatriza" aos poucos
+        # (−1 por recálculo) até zerar, mantendo o gato recuperável.
+        update["destruction_level"] = current_level - 1
 
     await db.cat_state.update_one({"_id": "main"}, {"$set": update})
     return await db.cat_state.find_one({"_id": "main"})
