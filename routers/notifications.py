@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from database import get_db
 from services.notification_service import (
@@ -10,6 +10,8 @@ import asyncio
 import json
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+_MAX_SSE_EVENTS = 100
 
 
 @router.get("/")
@@ -33,13 +35,17 @@ async def mark_read():
 
 
 @router.get("/stream")
-async def stream_notifications():
+async def stream_notifications(request: Request):
     async def event_generator():
         db = get_db()
-        while True:
+        count = 0
+        while count < _MAX_SSE_EVENTS:
+            if await request.is_disconnected():
+                break
             notif = await generate_useless_notification(db)
             data = json.dumps({"message": notif["message"], "category": notif["category"]})
             yield f"data: {data}\n\n"
+            count += 1
             await asyncio.sleep(30)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

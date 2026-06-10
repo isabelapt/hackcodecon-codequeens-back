@@ -43,7 +43,10 @@ async def get_procrastination_excuse(
     new_date = (scheduled_at or datetime.utcnow()) + timedelta(hours=suggested_hours)
 
     try:
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not configured")
+        genai.configure(api_key=api_key)
         model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(_build_prompt(task_title, scheduled_str))
         excuse = response.text.strip()
