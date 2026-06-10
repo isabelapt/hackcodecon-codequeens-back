@@ -74,6 +74,8 @@ def put(task_id):
 @bp.patch("/<task_id>")
 def patch(task_id):
     body = request.get_json()
+    if not body:
+        return jsonify({"error": "Request body é obrigatório"}), 400
     allowed = {"nome", "data_termino", "concluida", "vezes_adiada", "desistiu"}
     updates = {k: v for k, v in body.items() if k in allowed}
     if not updates:

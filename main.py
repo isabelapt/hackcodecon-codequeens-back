@@ -1,13 +1,22 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import logging
+import os
+import sys
+from contextlib import asynccontextmanager
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from contextlib import asynccontextmanager
-import os, sys
+from fastapi.staticfiles import StaticFiles
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -23,8 +32,11 @@ scheduler = AsyncIOScheduler()
 
 
 async def _scheduled_notification():
-    db = get_db()
-    await generate_useless_notification(db)
+    try:
+        db = get_db()
+        await generate_useless_notification(db)
+    except Exception:
+        logger.exception("Scheduled notification generation failed")
 
 
 @asynccontextmanager
@@ -57,6 +69,11 @@ app.include_router(notifications.router, prefix="/api")
 
 _MONGODB_URL = os.getenv("MONGODB_URL")
 _MONGODB_DB = os.getenv("MONGODB_DB")
+
+if not _MONGODB_URL:
+    logger.warning("MONGODB_URL not set; Flask routes will fail to connect")
+if not _MONGODB_DB:
+    logger.warning("MONGODB_DB not set; Flask routes will use default database")
 
 flask_app = Flask(__name__)
 flask_app.register_blueprint(flask_tasks_bp)

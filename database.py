@@ -1,6 +1,10 @@
+import logging
 import os
-from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
+
+from motor.motor_asyncio import AsyncIOMotorClient
+
+logger = logging.getLogger(__name__)
 
 _client: AsyncIOMotorClient = None
 
@@ -17,6 +21,12 @@ async def connect_db():
     global _client
     url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
     _client = AsyncIOMotorClient(url)
+    try:
+        await _client.admin.command("ping")
+        logger.info("Connected to MongoDB at %s", url.split("@")[-1] if "@" in url else url)
+    except Exception:
+        logger.error("Failed to connect to MongoDB", exc_info=True)
+        raise
     await _seed_cat()
 
 

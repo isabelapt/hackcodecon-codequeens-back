@@ -1,7 +1,11 @@
+import logging
 import os
-import google.generativeai as genai
-from datetime import datetime, timedelta
 import random
+from datetime import datetime, timedelta
+
+import google.generativeai as genai
+
+logger = logging.getLogger(__name__)
 
 FALLBACK_EXCUSES = [
     "Mercúrio está retrógrado e isso afeta diretamente a sua motivação.",
@@ -36,6 +40,7 @@ Responda em português brasileiro."""
 
 async def get_procrastination_excuse(
     task_title: str,
+    description: str = "",
     scheduled_at: datetime = None,
 ) -> dict:
     scheduled_str = scheduled_at.strftime("%d/%m/%Y %H:%M") if scheduled_at else "agora"
@@ -48,6 +53,7 @@ async def get_procrastination_excuse(
         response = model.generate_content(_build_prompt(task_title, scheduled_str))
         excuse = response.text.strip()
     except Exception:
+        logger.warning("Gemini API call failed for task '%s', using fallback excuse", task_title, exc_info=True)
         excuse = random.choice(FALLBACK_EXCUSES)
 
     return {

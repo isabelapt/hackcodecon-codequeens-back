@@ -1,6 +1,10 @@
-from datetime import datetime
-from motor.motor_asyncio import AsyncIOMotorDatabase
+import logging
 import random
+from datetime import datetime
+
+from motor.motor_asyncio import AsyncIOMotorDatabase
+
+logger = logging.getLogger(__name__)
 
 MOOD_DESCRIPTIONS = {
     "happy":   "Seu gato está radiante! Ele está fazendo biscoitinhos e cantando.",
@@ -114,6 +118,11 @@ async def recalculate_cat(db: AsyncIOMotorDatabase) -> dict:
 
 async def feed_cat(db: AsyncIOMotorDatabase) -> dict:
     cat = await db.cat_state.find_one({"_id": "main"})
+    if not cat:
+        logger.warning("Cat state not found when feeding; re-seeding")
+        from database import _seed_cat
+        await _seed_cat()
+        cat = await db.cat_state.find_one({"_id": "main"})
     new_happiness = min(100.0, cat.get("happiness", 50) + 15)
     new_hunger = max(0.0, cat.get("hunger", 50) - 20)
     await db.cat_state.update_one(
