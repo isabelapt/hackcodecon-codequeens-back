@@ -1,22 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from datetime import datetime
-from bson import ObjectId
 
 from database import get_db
-from models import TaskCreate, ProcrastinateDecision, serialize_doc
+from models import TaskCreate, ProcrastinateDecision
 from services.gemini_service import get_procrastination_excuse
 from services.cat_service import recalculate_cat
+from services.shared import serialize_doc, get_doc_or_404
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
-
-def _serialize_task(doc: dict) -> dict:
-    doc = dict(doc)
-    doc["id"] = str(doc.pop("_id"))
-    for field in ("scheduled_at", "postponed_to", "created_at", "completed_at"):
-        if isinstance(doc.get(field), datetime):
-            doc[field] = doc[field].isoformat()
-    return doc
+TASK_DATE_FIELDS = ["scheduled_at", "postponed_to", "created_at", "completed_at"]
 
 
 async def _mark_overdue():
@@ -54,7 +47,7 @@ async def list_tasks():
     db = get_db()
     await _mark_overdue()
     cursor = db.tasks.find().sort("created_at", -1)
-    return [_serialize_task(t) async for t in cursor]
+    return [serialize_doc(t, TASK_DATE_FIELDS) async for t in cursor]
 
 
 @router.post("/", status_code=201)
@@ -81,7 +74,7 @@ async def create_task(payload: TaskCreate):
     task = await db.tasks.find_one({"_id": task_id})
 
     return {
-        "task": _serialize_task(task),
+        "task": serialize_doc(task, TASK_DATE_FIELDS),
         "excuse": excuse_data["excuse"],
         "suggested_postpone_hours": excuse_data["suggested_postpone_hours"],
         "suggested_new_date": excuse_data["suggested_new_date"],
@@ -92,14 +85,7 @@ async def create_task(payload: TaskCreate):
 @router.post("/{task_id}/decide")
 async def decide_procrastination(task_id: str, decision: ProcrastinateDecision):
     db = get_db()
-    try:
-        oid = ObjectId(task_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID inválido")
-
-    task = await db.tasks.find_one({"_id": oid})
-    if not task:
-        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    task = await get_doc_or_404(db, "tasks", task_id)
 
     if decision.accept_postponement:
         update = {
@@ -114,44 +100,31 @@ async def decide_procrastination(task_id: str, decision: ProcrastinateDecision):
         update = {"status": "pending"}
         message = "Corajoso. O gato está impressionado e ligeiramente decepcionado."
 
-    await db.tasks.update_one({"_id": oid}, {"$set": update})
+    await db.tasks.update_one({"_id": task["_id"]}, {"$set": update})
     await recalculate_cat(db)
-    task = await db.tasks.find_one({"_id": oid})
-    return {"task": _serialize_task(task), "message": message}
+    task = await db.tasks.find_one({"_id": task["_id"]})
+    return {"task": serialize_doc(task, TASK_DATE_FIELDS), "message": message}
 
 
 @router.patch("/{task_id}/complete")
 async def complete_task(task_id: str):
     db = get_db()
-    try:
-        oid = ObjectId(task_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID inválido")
-
-    task = await db.tasks.find_one({"_id": oid})
-    if not task:
-        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    task = await get_doc_or_404(db, "tasks", task_id)
 
     await db.tasks.update_one(
-        {"_id": oid},
+        {"_id": task["_id"]},
         {"$set": {"status": "done", "completed_at": datetime.utcnow()}},
     )
     await recalculate_cat(db)
-    task = await db.tasks.find_one({"_id": oid})
-    return {"task": _serialize_task(task), "message": "Tarefa concluída! O gato ficou 15% mais feliz."}
+    task = await db.tasks.find_one({"_id": task["_id"]})
+    return {"task": serialize_doc(task, TASK_DATE_FIELDS), "message": "Tarefa concluída! O gato ficou 15% mais feliz."}
 
 
 @router.delete("/{task_id}")
 async def delete_task(task_id: str):
     db = get_db()
-    try:
-        oid = ObjectId(task_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID inválido")
+    task = await get_doc_or_404(db, "tasks", task_id)
 
-    result = await db.tasks.delete_one({"_id": oid})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
-
+    await db.tasks.delete_one({"_id": task["_id"]})
     await recalculate_cat(db)
     return {"message": "Tarefa deletada. Uma forma válida de concluir."}

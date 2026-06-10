@@ -1,6 +1,7 @@
-from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import random
+
+from services.shared import serialize_doc, build_notification_doc
 
 USELESS_FACTS = [
     "🌍 URGENTE: A Terra continua redonda. Situação monitorada.",
@@ -27,12 +28,7 @@ USELESS_FACTS = [
 
 async def generate_useless_notification(db: AsyncIOMotorDatabase) -> dict:
     msg = random.choice(USELESS_FACTS)
-    doc = {
-        "message": msg,
-        "category": "useless_fact",
-        "is_read": False,
-        "created_at": datetime.utcnow(),
-    }
+    doc = build_notification_doc(msg, "useless_fact")
     result = await db.notifications.insert_one(doc)
     doc["_id"] = str(result.inserted_id)
     return doc
@@ -42,10 +38,7 @@ async def get_unread_notifications(db: AsyncIOMotorDatabase, limit: int = 20) ->
     cursor = db.notifications.find({"is_read": False}).sort("created_at", -1).limit(limit)
     docs = []
     async for doc in cursor:
-        doc["id"] = str(doc.pop("_id"))
-        if "created_at" in doc:
-            doc["created_at"] = doc["created_at"].isoformat()
-        docs.append(doc)
+        docs.append(serialize_doc(doc, ["created_at"]))
     return docs
 
 
