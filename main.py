@@ -7,7 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
-import os, sys
+import os
+import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -44,11 +45,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+    allow_credentials=True,
 )
 
 app.include_router(tasks.router, prefix="/api")
@@ -59,6 +63,7 @@ _MONGODB_URL = os.getenv("MONGODB_URL")
 _MONGODB_DB = os.getenv("MONGODB_DB")
 
 flask_app = Flask(__name__)
+flask_app.config["DEBUG"] = False
 flask_app.register_blueprint(flask_tasks_bp)
 
 @flask_app.before_request

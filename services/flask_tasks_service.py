@@ -1,4 +1,5 @@
 from bson import ObjectId
+from bson.errors import InvalidId
 from datetime import datetime, timezone
 import asyncio
 from services.gemini_service import get_procrastination_excuse
@@ -6,6 +7,8 @@ from services.cat_service import recalculate_cat_sync
 
 
 def serialize(task):
+    if task is None:
+        return None
     task["id"] = str(task.pop("_id"))
     return task
 
@@ -15,7 +18,12 @@ def get_all(col):
 
 
 def get_one(col, task_id):
-    return serialize(col.find_one({"_id": ObjectId(task_id)}))
+    try:
+        oid = ObjectId(task_id)
+    except (InvalidId, TypeError):
+        return None
+    doc = col.find_one({"_id": oid})
+    return serialize(doc)
 
 
 def create(col, body):
