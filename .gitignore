@@ -36,7 +36,7 @@ build/
 .ruff_cache/
 .coverage
 htmlcov/
-tests/*
+
 
 # ── IDEs ─────────────────────────────────────────────────
 .vscode/
