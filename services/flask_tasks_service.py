@@ -1,21 +1,18 @@
 from bson import ObjectId
 from datetime import datetime, timezone
 import asyncio
+
 from services.gemini_service import get_procrastination_excuse
 from services.cat_service import recalculate_cat_sync
-
-
-def serialize(task):
-    task["id"] = str(task.pop("_id"))
-    return task
+from services.shared import serialize_doc
 
 
 def get_all(col):
-    return [serialize(t) for t in col.find()]
+    return [serialize_doc(t) for t in col.find()]
 
 
 def get_one(col, task_id):
-    return serialize(col.find_one({"_id": ObjectId(task_id)}))
+    return serialize_doc(col.find_one({"_id": ObjectId(task_id)}))
 
 
 def create(col, body):
@@ -45,7 +42,7 @@ def put(col, task_id, body):
     result = col.find_one_and_replace({"_id": ObjectId(task_id)}, updated, return_document=True)
     if result:
         recalculate_cat_sync(col.database)
-    return serialize(result) if result else None
+    return serialize_doc(result) if result else None
 
 
 def patch(col, task_id, updates):
@@ -54,14 +51,15 @@ def patch(col, task_id, updates):
     )
     if result:
         recalculate_cat_sync(col.database)
-    return serialize(result) if result else None
+    return serialize_doc(result) if result else None
 
 
 def delete(col, task_id):
     result = col.find_one_and_delete({"_id": ObjectId(task_id)})
     if result:
         recalculate_cat_sync(col.database)
-    return serialize(result) if result else None
+    return serialize_doc(result) if result else None
+
 
 async def build_excuse(nome, data_termino=None):
     if isinstance(data_termino, str):
@@ -70,6 +68,7 @@ async def build_excuse(nome, data_termino=None):
         except ValueError:
             data_termino = None
     return await get_procrastination_excuse(nome, data_termino)
+
 
 def get_excuse(nome, data_termino=None):
     return asyncio.run(build_excuse(nome, data_termino))

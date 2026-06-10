@@ -1,21 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional, Literal
 from datetime import datetime
-
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
-def serialize_doc(doc: dict) -> dict:
-    """Converte _id do MongoDB e datetimes para serialização JSON."""
-    if doc is None:
-        return None
-    doc = dict(doc)
-    if "_id" in doc:
-        doc["id"] = str(doc.pop("_id"))
-    for k, v in doc.items():
-        if isinstance(v, datetime):
-            doc[k] = v.isoformat()
-    return doc
 
 
 # ── Task ─────────────────────────────────────────────────────────────────────
